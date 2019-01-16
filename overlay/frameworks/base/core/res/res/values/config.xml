@@ -629,4 +629,6 @@
     <integer name="config_drawArrowLeftDefault">6</integer>
     <integer name="config_drawArrowRightDefault">5</integer>
 
+    <!-- True if the firmware supports connected MAC randomization -->
+    <bool name="config_wifi_connected_mac_randomization_supported">true</bool>
 </resources>
