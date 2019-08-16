@@ -442,3 +442,11 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/wifi/WCNSS_qcom_cfg.ini:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/WCNSS_qcom_cfg.ini
 
 export EXTENDED_BUILD_TYPE=OFFICIAL
+# Wi-Fi Display
+#PRODUCT_BOOT_JARS += \
+#    WfdCommon
+
+# XiaomiParts
+PRODUCT_PACKAGES += \
+    XiaomiParts
+
