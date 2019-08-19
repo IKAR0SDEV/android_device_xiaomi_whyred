@@ -41,6 +41,8 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES := external/libxml2/include \
                     external/icu/icu4c/source/common
 
+LOCAL_CFLAGS += -Wall -Wextra -Werror
+
 # Include target-specific files.
 ifeq ($(call is-board-platform-in-list,sdm660), true)
 LOCAL_SRC_FILES += power-660.c

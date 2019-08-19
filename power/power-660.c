@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2018 The LineageOS Project
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -37,8 +38,8 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 
-#define LOG_TAG "QTI PowerHAL"
-#include <utils/Log.h>
+#define LOG_TAG "QCOM PowerHAL"
+#include <log/log.h>
 #include <hardware/hardware.h>
 #include <hardware/power.h>
 
@@ -50,134 +51,26 @@
 
 #define MIN_VAL(X,Y) ((X>Y)?(Y):(X))
 
-static int saved_interactive_mode = -1;
-static int display_hint_sent;
 static int video_encode_hint_sent;
-static int cam_preview_hint_sent;
 
-static int camera_hint_ref_count;
-static void process_video_encode_hint(void *metadata);
-//static void process_cam_preview_hint(void *metadata);
-
-static bool is_target_SDM630() /* Returns value=630 if target is SDM630 else value 0 */
+/**
+ * If target is SDM630:
+ *     return true
+ * else:
+ *     return false
+ */
+static bool is_target_SDM630(void)
 {
-    int fd;
-    bool is_target_SDM630=false;
-    char buf[10] = {0};
-    fd = open("/sys/devices/soc0/soc_id", O_RDONLY);
-    if (fd >= 0) {
-        if (read(fd, buf, sizeof(buf) - 1) == -1) {
-            ALOGW("Unable to read soc_id");
-            is_target_SDM630 = false;
-        } else {
-            int soc_id = atoi(buf);
-            if (soc_id == 318 || soc_id== 327) {
-            is_target_SDM630 = true; /* Above SOCID for SDM630 */
-            }
-        }
-    }
-    close(fd);
-    return is_target_SDM630;
+    static bool is_SDM630 = false;
+    int soc_id;
+
+    soc_id = get_soc_id();
+    if (soc_id == 318 || soc_id == 327)
+        is_SDM630 = true;
+
+    return is_SDM630;
 }
 
-int  power_hint_override(power_hint_t hint, void *data)
-{
-
-    switch(hint) {
-        case POWER_HINT_VSYNC:
-            break;
-        case POWER_HINT_VIDEO_ENCODE:
-        {
-            process_video_encode_hint(data);
-            return HINT_HANDLED;
-        }
-    }
-    return HINT_NONE;
-}
-
-int  set_interactive_override(int on)
-{
-    char governor[80];
-    char tmp_str[NODE_MAX];
-    int resource_values[20];
-    int num_resources;
-    struct video_encode_metadata_t video_encode_metadata;
-    int rc;
-
-    ALOGI("Got set_interactive hint");
-
-    if (get_scaling_governor_check_cores(governor, sizeof(governor),CPU0) == -1) {
-        if (get_scaling_governor_check_cores(governor, sizeof(governor),CPU1) == -1) {
-            if (get_scaling_governor_check_cores(governor, sizeof(governor),CPU2) == -1) {
-                if (get_scaling_governor_check_cores(governor, sizeof(governor),CPU3) == -1) {
-                    ALOGE("Can't obtain scaling governor.");
-                    return HINT_HANDLED;
-                }
-            }
-        }
-    }
-
-    if (!on) {
-        /* Display off. */
-             if ((strncmp(governor, INTERACTIVE_GOVERNOR, strlen(INTERACTIVE_GOVERNOR)) == 0) &&
-                (strlen(governor) == strlen(INTERACTIVE_GOVERNOR))) {
-             /*
-                 1. CPUfreq params
-                        - hispeed freq for big - 1113Mhz
-                        - go hispeed load for big - 95
-                        - above_hispeed_delay for big - 40ms
-                2. BusDCVS V2 params
-                        - Sample_ms of 10ms
-            */
-            if(is_target_SDM630()){
-                int res[] = { 0x41414000, 0x459,
-                              0x41410000, 0x5F,
-                              0x41400000, 0x4,
-                              0x41820000, 0xA };
-                memcpy(resource_values, res, MIN_VAL(sizeof(resource_values), sizeof(res)));
-                num_resources = sizeof(res)/sizeof(res[0]);
-            }
-             /*
-                 1. CPUfreq params
-                        - hispeed freq for little - 902Mhz
-                        - go hispeed load for little - 95
-                        - above_hispeed_delay for little - 40ms
-                 2. BusDCVS V2 params
-                        - Sample_ms of 10ms
-                 3. Sched group upmigrate - 500
-            */
-            else{
-                int res[] =  { 0x41414100, 0x386,
-                               0x41410100, 0x5F,
-                               0x41400100, 0x4,
-                               0x41820000, 0xA,
-                               0x40C54000, 0x1F4};
-                memcpy(resource_values, res, MIN_VAL(sizeof(resource_values), sizeof(res)));
-                num_resources = sizeof(res)/sizeof(res[0]);
-
-            }
-               if (!display_hint_sent) {
-                   perform_hint_action(DISPLAY_STATE_HINT_ID,
-                   resource_values, num_resources);
-                  display_hint_sent = 1;
-                }
-             }
-
-    } else {
-        /* Display on. */
-          if ((strncmp(governor, INTERACTIVE_GOVERNOR, strlen(INTERACTIVE_GOVERNOR)) == 0) &&
-                (strlen(governor) == strlen(INTERACTIVE_GOVERNOR))) {
-
-             undo_hint_action(DISPLAY_STATE_HINT_ID);
-             display_hint_sent = 0;
-          }
-   }
-    saved_interactive_mode = !!on;
-    return HINT_HANDLED;
-}
-
-
-/* Video Encode Hint */
 static void process_video_encode_hint(void *metadata)
 {
     char governor[80];
@@ -185,21 +78,19 @@ static void process_video_encode_hint(void *metadata)
     int num_resources;
     struct video_encode_metadata_t video_encode_metadata;
 
-    ALOGI("Got process_video_encode_hint");
-
-    if (get_scaling_governor_check_cores(governor,
-        sizeof(governor),CPU0) == -1) {
-            if (get_scaling_governor_check_cores(governor,
-                sizeof(governor),CPU1) == -1) {
-                    if (get_scaling_governor_check_cores(governor,
-                        sizeof(governor),CPU2) == -1) {
-                            if (get_scaling_governor_check_cores(governor,
-                                sizeof(governor),CPU3) == -1) {
-                                    ALOGE("Can't obtain scaling governor.");
-                                    // return HINT_HANDLED;
-                            }
-                    }
+    if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU0) == -1) {
+        if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU1) == -1) {
+            if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU2) == -1) {
+                if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU3) == -1) {
+                    ALOGE("Can't obtain scaling governor.");
+                    return;
+                }
             }
+        }
+    }
+
+    if (!metadata) {
+        return;
     }
 
     /* Initialize encode metadata struct fields. */
@@ -207,79 +98,146 @@ static void process_video_encode_hint(void *metadata)
     video_encode_metadata.state = -1;
     video_encode_metadata.hint_id = DEFAULT_VIDEO_ENCODE_HINT_ID;
 
-    if (metadata) {
-        if (parse_video_encode_metadata((char *)metadata,
+    if (parse_video_encode_metadata((char *)metadata,
             &video_encode_metadata) == -1) {
-            ALOGE("Error occurred while parsing metadata.");
-            return;
-        }
-    } else {
+        ALOGE("Error occurred while parsing metadata.");
         return;
     }
 
     if (video_encode_metadata.state == 1) {
-        if ((strncmp(governor, INTERACTIVE_GOVERNOR,
-            strlen(INTERACTIVE_GOVERNOR)) == 0) &&
-            (strlen(governor) == strlen(INTERACTIVE_GOVERNOR))) {
-             /*
-                 1. CPUfreq params
-                        - hispeed freq for big - 1113Mhz
-                        - go hispeed load for big - 95
-                        - above_hispeed_delay for big - 40ms
-                        - target loads - 95
-                        - nr_run - 5
-                 2. BusDCVS V2 params
-                        - Sample_ms of 10ms
-            */
-            if(is_target_SDM630()){
-                int res[] = { 0x41414000, 0x459,
-                              0x41410000, 0x5F,
-                              0x41400000, 0x4,
-                              0x41420000, 0x5F,
-                              0x40C2C000, 0X5,
-                              0x41820000, 0xA};
+        if (is_interactive_governor(governor)) {
+            if (is_target_SDM630()) {
+                /*
+                   1. CPUfreq params
+                      - hispeed freq for big - 1113Mhz
+                      - go hispeed load for big - 95
+                      - above_hispeed_delay for big - 40ms
+                      - target loads - 95
+                      - nr_run - 5
+                   2. BusDCVS V2 params
+                      - Sample_ms of 10ms
+                 */
+                int res[] = {
+                    HISPEED_FREQ_BIG, 0x459,
+                    GO_HISPEED_LOAD_BIG, 0x5F,
+                    ABOVE_HISPEED_DELAY_BIG, 0x4,
+                    TARGET_LOADS_BIG, 0x5F,
+                    SCHED_IDLE_NR_RUN, 0X5,
+                    CPUBW_HWMON_SAMPLE_MS, 0xA
+                };
                 memcpy(resource_values, res, MIN_VAL(sizeof(resource_values), sizeof(res)));
                 num_resources = sizeof(res)/sizeof(res[0]);
-
-            }
-            /*
-                 1. CPUfreq params
-                        - hispeed freq for little - 902Mhz
-                        - go hispeed load for little - 95
-                        - above_hispeed_delay for little - 40ms
-                 2. BusDCVS V2 params
-                        - Sample_ms of 10ms
-            */
-            else{
-                int res[] = { 0x41414100, 0x386,
-                              0x41410100, 0x5F,
-                              0x41400100, 0x4,
-                              0x41820000, 0xA};
+            } else {
+                /*
+                   1. CPUfreq params
+                      - hispeed freq for little - 902Mhz
+                      - go hispeed load for little - 95
+                      - above_hispeed_delay for little - 40ms
+                   2. BusDCVS V2 params
+                      - Sample_ms of 10ms
+                 */
+                int res[] = {
+                    HISPEED_FREQ_LITTLE, 0x386,
+                    GO_HISPEED_LOAD_LITTLE, 0x5F,
+                    ABOVE_HISPEED_DELAY_LITTLE, 0x4,
+                    CPUBW_HWMON_SAMPLE_MS, 0xA
+                };
                 memcpy(resource_values, res, MIN_VAL(sizeof(resource_values), sizeof(res)));
                 num_resources = sizeof(res)/sizeof(res[0]);
             }
-            camera_hint_ref_count++;
-            if (camera_hint_ref_count == 1) {
-                if (!video_encode_hint_sent) {
-                    perform_hint_action(video_encode_metadata.hint_id,
-                    resource_values, num_resources);
-                    video_encode_hint_sent = 1;
-                }
-           }
+            if (!video_encode_hint_sent) {
+                perform_hint_action(video_encode_metadata.hint_id,
+                        resource_values, num_resources);
+                video_encode_hint_sent = 1;
+            }
         }
     } else if (video_encode_metadata.state == 0) {
-        if ((strncmp(governor, INTERACTIVE_GOVERNOR,
-            strlen(INTERACTIVE_GOVERNOR)) == 0) &&
-            (strlen(governor) == strlen(INTERACTIVE_GOVERNOR))) {
-            camera_hint_ref_count--;
-            if (!camera_hint_ref_count) {
-                undo_hint_action(video_encode_metadata.hint_id);
-                video_encode_hint_sent = 0;
-            }
-            return ;
+        if (is_interactive_governor(governor)) {
+            undo_hint_action(video_encode_metadata.hint_id);
+            video_encode_hint_sent = 0;
         }
     }
-    return;
 }
 
+int power_hint_override(power_hint_t hint, void *data)
+{
+    switch (hint) {
+        case POWER_HINT_VSYNC:
+            break;
+        case POWER_HINT_VIDEO_ENCODE:
+            process_video_encode_hint(data);
+            return HINT_HANDLED;
+        default:
+            break;
+    }
+    return HINT_NONE;
+}
 
+int set_interactive_override(int on)
+{
+    char governor[80];
+    int resource_values[20];
+    int num_resources;
+
+    if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU0) == -1) {
+        if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU1) == -1) {
+            if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU2) == -1) {
+                if (get_scaling_governor_check_cores(governor, sizeof(governor), CPU3) == -1) {
+                    ALOGE("Can't obtain scaling governor.");
+                    return HINT_NONE;
+                }
+            }
+        }
+    }
+
+    if (!on) {
+        /* Display off. */
+        if (is_interactive_governor(governor)) {
+            if (is_target_SDM630()) {
+                /*
+                   1. CPUfreq params
+                      - hispeed freq for big - 1113Mhz
+                      - go hispeed load for big - 95
+                      - above_hispeed_delay for big - 40ms
+                   2. BusDCVS V2 params
+                      - Sample_ms of 10ms
+                 */
+                int res[] = {
+                    HISPEED_FREQ_BIG, 0x459,
+                    GO_HISPEED_LOAD_BIG, 0x5F,
+                    ABOVE_HISPEED_DELAY_BIG, 0x4,
+                    CPUBW_HWMON_SAMPLE_MS, 0xA
+                };
+                memcpy(resource_values, res, MIN_VAL(sizeof(resource_values), sizeof(res)));
+                num_resources = sizeof(res)/sizeof(res[0]);
+            } else {
+                /*
+                   1. CPUfreq params
+                      - hispeed freq for little - 902Mhz
+                      - go hispeed load for little - 95
+                      - above_hispeed_delay for little - 40ms
+                   2. BusDCVS V2 params
+                      - Sample_ms of 10ms
+                   3. Sched group upmigrate - 500
+                 */
+                int res[] =  {
+                    HISPEED_FREQ_LITTLE, 0x386,
+                    GO_HISPEED_LOAD_LITTLE, 0x5F,
+                    ABOVE_HISPEED_DELAY_LITTLE, 0x4,
+                    CPUBW_HWMON_SAMPLE_MS, 0xA,
+                    SCHED_GROUP_UP_MIGRATE, 0x1F4
+                };
+                memcpy(resource_values, res, MIN_VAL(sizeof(resource_values), sizeof(res)));
+                num_resources = sizeof(res)/sizeof(res[0]);
+            }
+            perform_hint_action(DISPLAY_STATE_HINT_ID,
+                    resource_values, num_resources);
+        }
+    } else {
+        /* Display on. */
+        if (is_interactive_governor(governor)) {
+            undo_hint_action(DISPLAY_STATE_HINT_ID);
+        }
+    }
+    return HINT_HANDLED;
+}
