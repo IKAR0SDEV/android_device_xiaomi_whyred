@@ -26,10 +26,11 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
 $(call inherit-product, device/xiaomi/whyred/device.mk)
 
 # Inherit some common AospExtended stuff.
-$(call inherit-product, vendor/aosp/common.mk)
-
+$(call inherit-product, vendor/havoc/config/common_full_phone.mk)
 # Set Boot Animination Resolution
-TARGET_BOOT_ANIMATION_RES := 2140
+TARGET_BOOT_ANIMATION_RES := 1080
+TARGET_GAPPS_ARCH := arm64
+IS_PHONE := true
 
 # Inherit from custom vendor
 $(call inherit-product, vendor/MiuiCamera/config.mk)
@@ -49,11 +50,7 @@ PRODUCT_BUILD_PROP_OVERRIDES += \
 
 TARGET_VENDOR := Xiaomi
 
-# Set this flag in build script
-ifeq ($(CURRENT_BUILD_TYPE), gapps)
-# Use Gapps
-TARGET_SHIPS_SEPERATE_GAPPS_BUILD := true
-WITH_GAPPS := true
-TARGET_GAPPS_ARCH := arm64
-IS_PHONE := true
-endif
+HAVOC_BUILD_TYPE := Fan-Edition
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.havoc.maintainer=IkarosDev
+
