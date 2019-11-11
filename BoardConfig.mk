@@ -163,6 +163,9 @@ TARGET_FS_CONFIG_GEN := $(DEVICE_PATH)/config.fs
 BOARD_HAVE_QCOM_FM := true
 BOARD_HAS_QCA_FM_SOC := "cherokee"
 
+# Gestures
+TARGET_GESTURES_NODE := "/proc/touchpanel/gesture_enable"
+
 # GPS
 TARGET_NO_RPC := true
 USE_DEVICE_SPECIFIC_GPS := true
