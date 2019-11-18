@@ -34,9 +34,8 @@ PRODUCT_PROPERTY_OVERRIDES += \
     vendor.audio.tunnel.encode=false \
     persist.vendor.audio.ras.enabled=false \
     vendor.audio.offload.buffer.size.kb=64 \
-    audio.offload.min.duration.secs=30 \
     audio.offload.video=true \
-    vendor.audio.offload.track.enable=true \
+    vendor.audio.offload.track.enable=false \
     audio.deep_buffer.media=true \
     vendor.voice.path.for.pcm.voip=true \
     vendor.audio.offload.multiaac.enable=true \
@@ -52,8 +51,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
     vendor.audio.parser.ip.buffer.size=262144 \
     vendor.audio.flac.sw.decoder.24bit=true \
     persist.vendor.bt.a2dp_offload_cap=sbc-aptx-aptxhd-aac \
-    ro.bluetooth.a2dp_offload.supported=true \
-    persist.bluetooth.a2dp_offload.disabled=false \
     vendor.audio.use.sw.alac.decoder=true \
     vendor.audio.use.sw.ape.decoder=true \
     vendor.audio.hw.aac.encoder=true \
@@ -61,6 +58,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     audio.sys.noisy.broadcast.delay=600 \
     persist.vendor.audio.hifi.int_codec=true \
     audio.sys.offload.pstimeout.secs=3 \
+    vendor.audio.adm.buffering.ms=6 \
     ro.vendor.sensors.facing=false \
     ro.vendor.sensors.cmc=false \
     ro.vendor.sdk.sensors.gestures=false
@@ -71,7 +69,6 @@ vendor.audio.volume.headset.gain.depcal=true
 
 #add dynamic feature flags here
 PRODUCT_PROPERTY_OVERRIDES += \
-vendor.audio.feature.a2dp_offload.enable=true \
 vendor.audio.feature.afe_proxy.enable=true \
 vendor.audio.feature.anc_headset.enable=true \
 vendor.audio.feature.battery_listener.enable=false \
@@ -129,7 +126,8 @@ vendor.audio.spkr_prot.tx.sampling_rate=48000
 #Set AudioFlinger client heap size
 PRODUCT_PROPERTY_OVERRIDES += \
     vendor.audio_hal.in_period_size=144 \
-    vendor.audio_hal.period_multiplier=3
+    vendor.audio_hal.period_multiplier=3 \
+    vendor.audio.adm.buffering.ms=2
 
 # IMS
 PRODUCT_PROPERTY_OVERRIDES += \
