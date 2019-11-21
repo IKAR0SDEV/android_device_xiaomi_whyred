@@ -453,11 +453,5 @@ export EXTENDED_BUILD_TYPE=OFFICIAL
 
 # XiaomiParts
 PRODUCT_PACKAGES += \
-<<<<<<< HEAD
     XiaomiParts
-=======
-    libaacwrapper \
-    libmediaextractorservice \
-    libnl
->>>>>>> 9166a3d... whyred: Update wfd stack from mata
 
